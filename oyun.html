@@ -1,0 +1,504 @@
+Nasıl Oynanır?
+Oyuncu sayısını üstten seç (2P-3P-4P).
+
+Kontroller:
+
+P1: Sol, Sağ, Zıpla (← → ↑)
+
+P2: A, D, W
+
+P3: F, H, T
+
+P4: J, L, I
+
+Platformlar üzerinde zıplayıp anahtarı alın (anahtar sarı ve küçük).
+
+Anahtarı aldıktan sonra kapıya gidin (kapı koyu kahverengi kapalı, yeşil açık).
+
+Kapı açılınca 2 saniye beklenir, sonra otomatik sonraki levele geçilir.
+
+100 levele kadar zorluk artar, kolaydan hardcore’a gider.
+
+Önceki ve sonraki level butonları ile manuel geçiş yapılabilir.
+
+İstersen
+Daha gerçekçi grafikler,
+
+Ses efektleri,
+
+Skor sistemi,
+
+Menü,
+
+Farklı oyun modları ekleyebilirim.
+
+Ama temel haliyle bu kod tamamen iş görür.
+
+İstersen bu dosyayla ilgili sorular sorabilir veya geliştirmeler isteyebilirsin!
+
+
+
+
+
+
+
+Şunu dedin:
+oyuncular oldu yer  küçük kalmış biraz onu büyüt ve bana öyle hepsini at
+
+
+ChatGPT:
+Tabii! Platformları ve oyun alanını büyütüp oyuncuları biraz daha büyük gösterecek şekilde kodu güncelledim. Aynı zamanda oyun ekranı biraz daha geniş ve yüksek yapıldı ki hareket alanı daha rahat olsun.
+
+Güncellenmiş tam kod burada:
+html
+Kopyala
+Düzenle
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>100 Level Dinamik Platformer — Çok Oyunculu</title>
+<style>
+  :root{--bg:#e0f7fa;--panel:#b2ebf2;--muted:#006064}
+  html,body{height:100%;margin:0;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:var(--bg);color:#004d40}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--panel);box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+  .logo{font-weight:800;font-size:20px}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  button{background:#00796b;border:none;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600;transition:background 0.3s}
+  button:hover{background:#004d40;}
+  button.secondary{background:#4db6ac;color:#004d40;border:1px solid rgba(0,0,0,0.1);}
+  .wrap{display:flex;gap:16px;padding:12px 18px;flex-wrap:wrap;justify-content:center;}
+  .panel{background:#b2dfdb;border-radius:12px;padding:12px;box-shadow:0 4px 12px rgba(0,0,0,0.08);min-width:280px;max-width:320px;}
+  canvas{background:#e0f2f1;border-radius:12px;display:block;max-width:100%;height:auto;box-shadow:0 6px 18px rgba(0,0,0,0.1);}
+  .info{font-size:13px;color:#004d40;margin-top:8px}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .player-key{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:#b2dfdb;border:1px solid rgba(0,0,0,0.05);font-weight:600;}
+  #status, #levelInfo{font-weight:700;text-align:center;margin-top:8px;}
+  @media(max-width:900px){ 
+    .wrap{flex-direction:column;align-items:center} 
+    canvas{width:100%;height:auto} 
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">100 Level Dinamik Platformer — Çok Oyunculu</div>
+    <div class="controls">
+      <div style="margin-right:8px;font-weight:600;">Oyuncu sayısı:</div>
+      <button id="btn2">2P</button>
+      <button id="btn3">3P</button>
+      <button id="btn4">4P</button>
+      <button id="btnPrev" class="secondary" style="margin-left:20px;">Önceki Level</button>
+      <button id="btnNext" class="secondary">Sonraki Level</button>
+      <button id="reset" class="secondary" style="margin-left:20px;">Yeniden Başlat</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="panel">
+      <div style="font-weight:700">Kontroller</div>
+      <div class="legend" style="margin-top:8px">
+        <div class="player-key">P1: ← → ↑</div>
+        <div class="player-key">P2: A D W</div>
+        <div class="player-key">P3: F H T</div>
+        <div class="player-key">J L I</div>
+      </div>
+      <div id="levelInfo" class="info">Level 1 / 100 (Kolay)</div>
+      <div id="status" class="info">Oyuncu sayısını seçip başla.</div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <canvas id="game" width="1152" height="648"></canvas>
+    </div>
+  </div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const MAX_LEVEL = 100;
+
+let playerCount = 2;
+
+const colors = ['#3adcb6','#ffd24c','#d78aef','#ff9fb2'];
+
+const keysDown = {};
+
+const keyMap = {
+  37: ['p1','left'], 39: ['p1','right'], 38: ['p1','jump'],
+  65: ['p2','left'], 68: ['p2','right'], 87: ['p2','jump'],
+  70: ['p3','left'], 72: ['p3','right'], 84: ['p3','jump'],
+  74: ['p4','left'], 76: ['p4','right'], 73: ['p4','jump']
+};
+
+window.addEventListener('keydown', e=>{
+  const m = keyMap[e.keyCode];
+  if(m) keysDown[m[0]+'_'+m[1]] = true;
+});
+window.addEventListener('keyup', e=>{
+  const m = keyMap[e.keyCode];
+  if(m) keysDown[m[0]+'_'+m[1]] = false;
+});
+
+function randRange(min,max){
+  return Math.floor(Math.random()*(max-min+1))+min;
+}
+
+function getDifficulty(levelNum){
+  if(levelNum <= 10) return 'Kolay';
+  if(levelNum <= 40) return 'Orta';
+  if(levelNum <= 70) return 'Zor';
+  return 'Hardcore';
+}
+
+function generateLevel(levelNum){
+  const difficulty = getDifficulty(levelNum);
+  const platforms = [];
+
+  platforms.push({x:0, y:H-64, w:W, h:64});  // zemin biraz daha kalın ve yüksek
+
+  const platformCount = 10 + Math.floor((levelNum / MAX_LEVEL) * 15);
+
+  let lastX = 70;
+  let lastY = H - 64 - 60;
+
+  for(let i=0; i<platformCount; i++){
+    const maxPlatW = Math.max(120, 350 - levelNum * 2);
+    const platW = randRange(120, maxPlatW);
+
+    let nextY = lastY + randRange(-90,50);
+    if(nextY > H - 120) nextY = H - 120;
+    if(nextY < 200) nextY = 200;
+
+    let nextX = lastX + randRange(platW + 60, platW + 200);
+    if(nextX + platW > W - 150) nextX = W - platW - 150;
+
+    platforms.push({x: nextX, y: nextY, w: platW, h: 30});
+
+    lastX = nextX;
+    lastY = nextY;
+  }
+
+  const keyPlatform = platforms[1];
+  const key = {
+    x: keyPlatform.x + keyPlatform.w / 2 - 18,
+    y: keyPlatform.y - 36,
+    w:36, h:36,
+    taken:false,
+    owner:null
+  };
+
+  const doorPlatform = platforms[platforms.length - 1];
+  const door = {
+    x: doorPlatform.x + doorPlatform.w - 72,
+    y: doorPlatform.y - 108,
+    w:72, h:108,
+    open:false
+  };
+
+  return {
+    platforms,
+    key,
+    door,
+    difficulty,
+  };
+}
+
+let currentLevelIndex = 1;
+let currentLevel = generateLevel(currentLevelIndex);
+
+let players = [];
+let running = false;
+let doorOpenTime = 0;
+let doorOpened = false;
+let levelTransitioning = false;
+
+function resetPlayers(){
+  players = [];
+  const startX = 100;
+  for(let i=0; i<playerCount; i++){
+    players.push({
+      id: i+1,
+      x: startX + i*90,
+      y: H - 64 - 72,
+      w: 60, h: 72,
+      vx: 0, vy: 0,
+      onGround: false,
+      color: colors[i],
+      hasKey: false,
+      name: 'P'+(i+1)
+    });
+  }
+}
+
+function updateStatus(text){
+  document.getElementById('status').textContent = text;
+  document.getElementById('levelInfo').textContent = `Level ${currentLevelIndex} / ${MAX_LEVEL} (${currentLevel.difficulty})`;
+}
+
+function startGame(){
+  currentLevel = generateLevel(currentLevelIndex);
+  resetPlayers();
+  running = true;
+  doorOpened = false;
+  levelTransitioning = false;
+  currentLevel.door.open = false;
+  currentLevel.key.taken = false;
+  currentLevel.key.owner = null;
+  updateStatus("Anahtarı al, kapıya git!");
+}
+
+function rectsOverlap(a,b){
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+function update(dt){
+  if(!running) return;
+
+  for(let i=0; i<players.length; i++){
+    const p = players[i];
+    const id = 'p'+(i+1);
+
+    let move = 0;
+    if(keysDown[id+'_left']) move -= 1;
+    if(keysDown[id+'_right']) move += 1;
+
+    const speed = 4.2;
+
+    p.vx += move * 0.7;
+    p.vx *= 0.85;
+    p.vx = clamp(p.vx, -7, 7);
+
+    if(keysDown[id+'_jump'] && p.onGround){
+      p.vy = -18;
+      p.onGround = false;
+    }
+
+    p.vy += 1.2 * 0.9; // gravity * multiplier
+    p.x += p.vx;
+    p.y += p.vy;
+
+    p.x = clamp(p.x, 0, W - p.w);
+    if(p.y > H - p.h){
+      p.y = H - p.h;
+      p.vy = 0;
+      p.onGround = true;
+    }
+
+    p.onGround = false;
+    for(const plat of currentLevel.platforms){
+      if(rectsOverlap(p, plat)){
+        const prevY = p.y - p.vy;
+        if(prevY + p.h <= plat.y + 6){
+          p.y = plat.y - p.h;
+          p.vy = 0;
+          p.onGround = true;
+        } else {
+          if(p.x + p.w/2 < plat.x + plat.w/2) p.x = plat.x - p.w - 0.1;
+          else p.x = plat.x + plat.w + 0.1;
+        }
+      }
+    }
+
+    // Key pickup
+    const keyObj = currentLevel.key;
+    if(!keyObj.taken && rectsOverlap(p, keyObj)){
+      keyObj.taken = true;
+      p.hasKey = true;
+      keyObj.owner = p;
+      updateStatus(`${p.name} anahtarı aldı! Kapıya git.`);
+    }
+
+    if(p.hasKey && keyObj.owner !== p){
+      p.hasKey = false;
+    }
+
+    // Door interaction
+    const door = currentLevel.door;
+    if(rectsOverlap(p, door)){
+      if(p.hasKey && !door.open && !levelTransitioning){
+        door.open = true;
+        doorOpened = true;
+        updateStatus(`${p.name} kapıyı açtı! Level atlanıyor...`);
+        levelTransitioning = true;
+        doorOpenTime = performance.now();
+      } else if(!p.hasKey && !door.open){
+        updateStatus(`${p.name} kapıda — önce anahtarı al!`);
+      }
+    }
+  }
+
+  // Level geçişi (2 saniye kapı açık kalınca)
+  if(doorOpened && performance.now() - doorOpenTime > 2000){
+    nextLevel();
+  }
+}
+
+function drawRoundedRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawDoor(door){
+  ctx.save();
+  ctx.fillStyle = door.open ? '#4caf50' : '#6d4c41';
+  drawRoundedRect(door.x, door.y, door.w, door.h, 18);
+
+  if(!door.open){
+    ctx.strokeStyle = '#3e2723';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(door.x + 15, door.y + 15);
+    ctx.lineTo(door.x + door.w - 15, door.y + door.h - 15);
+    ctx.moveTo(door.x + door.w - 15, door.y + 15);
+    ctx.lineTo(door.x + 15, door.y + door.h - 15);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = '#a5d6a7';
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('AÇIK', door.x + door.w/2, door.y + door.h/2 + 14);
+  }
+
+  ctx.restore();
+}
+
+function drawKey(key){
+  ctx.fillStyle = '#ffc107';
+  if(key.taken && key.owner){
+    const o = key.owner;
+    ctx.beginPath();
+    ctx.arc(o.x + o.w/2 + 20, o.y - 10, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(o.x + o.w/2 - 3, o.y - 10, 27, 9);
+  } else if(!key.taken){
+    drawRoundedRect(key.x, key.y, key.w, key.h, 10);
+    ctx.fillStyle = '#b28704';
+    ctx.fillRect(key.x + 9, key.y + 9, 10, 10);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W, H);
+
+  // Arka plan degrade
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#b2dfdb');
+  grad.addColorStop(1, '#004d40');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Platformlar
+  for(const plat of currentLevel.platforms){
+    ctx.fillStyle = '#004d40';
+    drawRoundedRect(plat.x, plat.y, plat.w, plat.h, 14);
+    ctx.fillStyle = '#00695c';
+    ctx.fillRect(plat.x, plat.y + plat.h - 10, plat.w, 10);
+  }
+
+  // Kapı
+  drawDoor(currentLevel.door);
+
+  // Anahtar
+  drawKey(currentLevel.key);
+
+  // Oyuncular
+  for(const p of players){
+    ctx.fillStyle = p.color;
+    drawRoundedRect(p.x, p.y, p.w, p.h, 20);
+
+    // Gözler
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(p.x + 18, p.y + 28, 8, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w - 18, p.y + 28, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(p.x + 18, p.y + 28, 4, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w - 18, p.y + 28, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // İsim
+    ctx.fillStyle = '#fff';
+    ctx.font = '22px Segoe UI';
+    ctx.fillText(p.name + (p.hasKey ? ' 🔑' : ''), p.x - 4, p.y - 16);
+  }
+
+  // HUD - oyuncu durumu
+  ctx.fillStyle = '#004d40';
+  ctx.font = '20px Segoe UI';
+  let x = 16;
+  for(const p of players){
+    ctx.fillStyle = p.color;
+    ctx.fillText(`${p.name}${p.hasKey ? ' (Anahtar)' : ''}`, x, 36);
+    x += 170;
+  }
+
+  if(!running){
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.font = '36px Segoe UI';
+    ctx.fillText('Oyun durdu', W/2 - 110, 60);
+  }
+}
+
+function nextLevel(){
+  currentLevelIndex++;
+  if(currentLevelIndex > MAX_LEVEL) currentLevelIndex = 1;
+  startGame();
+}
+
+let last = performance.now();
+function loop(t){
+  const dt = (t - last) / 16.666;
+  last = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('btn2').onclick = () => {
+  playerCount = 2;
+  startGame();
+};
+document.getElementById('btn3').onclick = () => {
+  playerCount = 3;
+  startGame();
+};
+document.getElementById('btn4').onclick = () => {
+  playerCount = 4;
+  startGame();
+};
+document.getElementById('btnPrev').onclick = () => {
+  if(levelTransitioning) return;
+  currentLevelIndex--;
+  if(currentLevelIndex < 1) currentLevelIndex = MAX_LEVEL;
+  startGame();
+};
+document.getElementById('btnNext').onclick = () => {
+  if(levelTransitioning) return;
+  currentLevelIndex++;
+  if(currentLevelIndex > MAX_LEVEL) currentLevelIndex = 1;
+  startGame();
+};
+document.getElementById('reset').onclick = () => {
+  if(levelTransitioning) return;
+  startGame();
+};
+
+startGame();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
